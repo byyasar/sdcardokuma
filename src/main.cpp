@@ -126,7 +126,7 @@ void test_eeprom(int page)
   // Print to Serial Monitor
   Serial.println("Reading Finished!");
   // testdrawpic();
-}
+} // end test_eeprom  
 void testdrawbitmap(uint8_t bitmap[])
 {
   display.clearDisplay();
