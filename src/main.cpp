@@ -12,7 +12,12 @@
 #define OLED_RESET -1       // Reset pin # (or -1 if sharing Arduino reset pin)
 #define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+#define EEPROM_I2C_ADDRESS 0x50 // EEPROM I2C Address
 
+int page = 0;
+const int maxaddress = 512;
+byte ram_array[maxaddress];
+byte readVal = 0;
 uint8_t buffer[256] = {'\0'};
 // int index = 0;
 int index2 = 0;
@@ -23,6 +28,105 @@ uint16_t eskiZaman = 0;
 bool durum = false;
 bool durum2 = false;
 
+void writeEEPROM(int address, byte val, int i2c_address)
+{
+  // Begin transmission to I2C EEPROM
+  Wire.beginTransmission(i2c_address);
+
+  // Send memory address as two 8-bit bytes
+  Wire.write((int)(address >> 8));   // MSB
+  Wire.write((int)(address & 0xFF)); // LSB
+
+  // Send data to be stored
+  Wire.write(val);
+
+  // End the transmission
+  Wire.endTransmission();
+
+  // Add 5ms delay for EEPROM
+  delay(50);
+}
+// Function to read from EEPROM
+byte readEEPROM(int address, int i2c_address)
+{
+  // Define byte for received data
+  byte rcvData = 0xFF;
+
+  // Begin transmission to I2C EEPROM
+  Wire.beginTransmission(i2c_address);
+
+  // Send memory address as two 8-bit bytes
+  Wire.write((int)(address >> 8));   // MSB
+  Wire.write((int)(address & 0xFF)); // LSB
+
+  // End the transmission
+  Wire.endTransmission();
+
+  // Request one byte of data at current memory address
+  Wire.requestFrom(i2c_address, 1);
+
+  // Read the data and assign to variable
+  rcvData = Wire.read();
+
+  // Return the data as function output
+  return rcvData;
+}
+void test_eeprom(int page)
+{
+  // Print to Serial Monitor
+  //  Serial.println("Start Writing...");
+
+  //   display.clearDisplay();
+  //   display.setTextSize(1);             // Normal 1:1 pixel scale
+  //   display.setTextColor(SSD1306_WHITE);        // Draw white text
+  //   display.setCursor(0, 0);            // Start at top-left corner
+  //   display.println(F("Writing to EEPROM..."));
+  //   display.display();
+
+  //   for (int address = page*maxaddress; address < (page*maxaddress)+maxaddress; address++){
+  //     writeEEPROM(address, ram_array[address-(page*maxaddress)], EEPROM_I2C_ADDRESS);
+  //     Serial.print("ADDR = ");
+  //     Serial.print(address);
+  //     Serial.print("   data:");
+  //     Serial.println(ram_array[address], HEX);
+  //     delay(1);
+  //   }
+
+  //   // Print to Serial Monitor
+  //   Serial.println("Writing Finished!");
+  //   delay(2000);    // Delay 2 Seconds
+
+  // Print to Serial Monitor
+  Serial.println("Begin Reading...");
+
+  display.clearDisplay();
+  display.setTextSize(1);              // Normal 1:1 pixel scale
+  display.setTextColor(SSD1306_WHITE); // Draw white text
+  display.setCursor(0, 0);             // Start at top-left corner
+  display.println(F("Reading from EEPROM.."));
+  display.display();
+
+  // Run until maximum address is reached
+  for (int address = page * maxaddress; address < (page * maxaddress) + maxaddress; address++)
+  {
+    // Read value from EEPROM
+    readVal = readEEPROM(address, EEPROM_I2C_ADDRESS);
+
+    // Print to Serial Monitor
+    //   Serial.print("ADDR = ");
+    //   Serial.print(address);
+    //    Serial.print("   data:");
+    //   Serial.println(readVal, HEX);
+    // Serial.print("ADDRsss = ");
+    //  Serial.println(address-(page*maxaddress));
+    ram_array[address - (page * maxaddress)] = readVal;
+    delay(1);
+  }
+
+  // Print to Serial Monitor
+  Serial.println("Reading Finished!");
+  // testdrawpic();
+}
 void testdrawbitmap(uint8_t bitmap[])
 {
   display.clearDisplay();
@@ -48,7 +152,9 @@ void sdKartOku()
         {
           char data[4] = {'\0'};
           sprintf(data, "%c%c%c%c", dizi[0], dizi[1], dizi[2], dizi[3]);
-          Serial.print(F("data:"));Serial.print(index2); Serial.println(data);
+          Serial.print(F("data:"));
+          Serial.print(index2);
+          Serial.println(data);
           buffer[index2] = strtol(data, NULL, 16);
           index2++;
           if (index2 == 256)
@@ -70,6 +176,7 @@ void sdKartOku()
 }
 void setup()
 {
+   Wire.begin();
   Serial.begin(9600);
   while (!Serial)
   {
@@ -96,27 +203,32 @@ void setup()
     display.println(F("Hello, world!"));
     display.display();
   }
+  // memcpy_P(ram_array, Image, maxaddress);// copy the image from flash memory to RAM
+  delay(50);
+  test_eeprom(page); 
 }
 
 void loop()
 {
-  yeniZaman = millis();
+  // yeniZaman = millis();
 
-  if (yeniZaman - eskiZaman > 5000)
-  {
-    eskiZaman = yeniZaman;
-    
-    if(!durum2){sdKartOku();
-     Serial.println(F("sd okundu"));
-    }
-   
-    if (durum == true&&durum2==true)
-    {
-      testdrawbitmap(buffer);
-    }
-    else
-    {
-      Serial.println(F("SD kart okuma yapilamadi"));
-    }
-  }
+  // if (yeniZaman - eskiZaman > 5000)
+  // {
+  //   eskiZaman = yeniZaman;
+
+  //   if (!durum2)
+  //   {
+  //     //sdKartOku();
+  //     Serial.println(F("sd okundu"));
+  //   }
+
+  //   if (durum == true && durum2 == true)
+  //   {
+  //     testdrawbitmap(buffer);
+  //   }
+  //   else
+  //   {
+  //     Serial.println(F("SD kart okuma yapilamadi"));
+  //   }
+  // }
 }
