@@ -13,13 +13,14 @@
 #define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define EEPROM_I2C_ADDRESS 0x50 // EEPROM I2C Address
+const byte interruptPin = 2;    // kesme pini
 
 int page = 0;
-const int maxaddress = 512;
+const int maxaddress = 128;
 byte ram_array[maxaddress];
 byte readVal = 0;
-uint8_t buffer[256] = {'\0'};
-// int index = 0;
+// uint8_t buffer[256] = {'\0'};
+//  int index = 0;
 int index2 = 0;
 const int chipSelect = 10;
 SdFat sd;
@@ -27,7 +28,13 @@ uint16_t yeniZaman = 0;
 uint16_t eskiZaman = 0;
 bool durum = false;
 bool durum2 = false;
-
+// byte Image [256];
+void testdrawbitmap(uint8_t bitmap[])
+{
+  display.clearDisplay();
+  display.drawBitmap(0, 0, bitmap, LOGO_WIDTH, LOGO_HEIGHT, 1);
+  display.display();
+}
 void writeEEPROM(int address, byte val, int i2c_address)
 {
   // Begin transmission to I2C EEPROM
@@ -46,7 +53,6 @@ void writeEEPROM(int address, byte val, int i2c_address)
   // Add 5ms delay for EEPROM
   delay(50);
 }
-// Function to read from EEPROM
 byte readEEPROM(int address, int i2c_address)
 {
   // Define byte for received data
@@ -97,7 +103,7 @@ void test_eeprom(int page)
   //   delay(2000);    // Delay 2 Seconds
 
   // Print to Serial Monitor
-  Serial.println("Begin Reading...");
+  //Serial.println("Begin Reading...");
 
   display.clearDisplay();
   display.setTextSize(1);              // Normal 1:1 pixel scale
@@ -124,15 +130,10 @@ void test_eeprom(int page)
   }
 
   // Print to Serial Monitor
-  Serial.println("Reading Finished!");
-  // testdrawpic();
-} // end test_eeprom  
-void testdrawbitmap(uint8_t bitmap[])
-{
-  display.clearDisplay();
-  display.drawBitmap(0, 0, bitmap, LOGO_WIDTH, LOGO_HEIGHT, 1);
-  display.display();
-}
+//  Serial.println("Reading Finished!");
+  testdrawbitmap(ram_array);
+} // end test_eeprom
+
 void sdKartOku()
 {
   File dataFile = sd.open("kodlama.txt");
@@ -152,12 +153,14 @@ void sdKartOku()
         {
           char data[4] = {'\0'};
           sprintf(data, "%c%c%c%c", dizi[0], dizi[1], dizi[2], dizi[3]);
-          Serial.print(F("data:"));
-          Serial.print(index2);
-          Serial.println(data);
-          buffer[index2] = strtol(data, NULL, 16);
+          // Image[index2] = strtol(data, NULL, 16);
+          writeEEPROM(index2, ram_array[index2 - (page * maxaddress)], EEPROM_I2C_ADDRESS);
+          // Serial.print(F("data:"));
+          // Serial.print(index2);
+          // Serial.println(data);
+          //ram_array[index2] = strtol(data, NULL, 16);
           index2++;
-          if (index2 == 256)
+          if (index2 == maxaddress)
           {
             break;
           }
@@ -174,18 +177,52 @@ void sdKartOku()
     durum2 = true;
   }
 }
+void blink()
+{
+   display.clearDisplay();
+  display.setTextSize(1);              // Normal 1:1 pixel scale
+  display.setTextColor(SSD1306_WHITE); // Draw white text
+  display.setCursor(0, 0);             // Start at top-left corner
+  display.println(F("Sd kart okunuyor.."));
+  display.display();
+
+ 
+  //Serial.println(F("sdden eeproma yaz"));
+  
+  sdKartOku();
+  //delay(500);
+  // memcpy_P(ram_array, Image, maxaddress);
+
+  // for (int address = page*maxaddress; address < (page*maxaddress)+maxaddress; address++){
+  //   writeEEPROM(address, ram_array[address-(page*maxaddress)], EEPROM_I2C_ADDRESS);
+  //   Serial.print("ADDR = ");
+  //   Serial.print(address);
+  //   Serial.print("   data:");
+  //   Serial.println(ram_array[address], HEX);
+  //   delay(1);
+  // }
+
+  // // Print to Serial Monitor
+  // Serial.println("Writing Finished!");
+  // delay(2000);    // Delay 2 Seconds
+  test_eeprom(page);
+}
+
 void setup()
 {
-   Wire.begin();
+  Wire.begin();
+   if (sd.begin(chipSelect))
+  {
+    // sdKartOku();
+    Serial.println(F("SD ok"));
+  }
+
+  pinMode(interruptPin, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(interruptPin), blink, FALLING);
   Serial.begin(9600);
   while (!Serial)
   {
     ; // wait for serial port to connect. Needed for native USB port only
-  }
-  if (sd.begin(chipSelect))
-  {
-    // sdKartOku();
-    Serial.println("SD ok");
   }
   if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS))
   {
@@ -205,7 +242,8 @@ void setup()
   }
   // memcpy_P(ram_array, Image, maxaddress);// copy the image from flash memory to RAM
   delay(50);
-  test_eeprom(page); 
+   test_eeprom(page);
+  //blink();
 }
 
 void loop()
