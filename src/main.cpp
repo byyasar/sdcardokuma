@@ -8,28 +8,28 @@
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 32 // OLED display height, in pixels
 #define LOGO_HEIGHT 32
-#define LOGO_WIDTH 128
+#define LOGO_WIDTH 32
 #define OLED_RESET -1       // Reset pin # (or -1 if sharing Arduino reset pin)
 #define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define EEPROM_I2C_ADDRESS 0x50 // EEPROM I2C Address
 const byte interruptPin = 2;    // kesme pini
-
-int page = 0;
-const int maxaddress = 128;
+volatile byte state = LOW;
+byte page = 0;
+const byte maxaddress = 110;
 byte ram_array[maxaddress];
 byte readVal = 0;
 // uint8_t buffer[256] = {'\0'};
 //  int index = 0;
-int index2 = 0;
-const int chipSelect = 10;
+byte index2 = 0;
+const byte chipSelect = 10;
 SdFat sd;
-uint16_t yeniZaman = 0;
-uint16_t eskiZaman = 0;
+//uint16_t yeniZaman = 0;
+//uint16_t eskiZaman = 0;
 bool durum = false;
 bool durum2 = false;
 // byte Image [256];
-void testdrawbitmap(uint8_t bitmap[])
+void testdrawbitmap(byte bitmap[maxaddress])
 {
   display.clearDisplay();
   display.drawBitmap(0, 0, bitmap, LOGO_WIDTH, LOGO_HEIGHT, 1);
@@ -118,7 +118,7 @@ void test_eeprom(int page)
     // Read value from EEPROM
     readVal = readEEPROM(address, EEPROM_I2C_ADDRESS);
 
-    // Print to Serial Monitor
+    //Print to Serial Monitor
     //   Serial.print("ADDR = ");
     //   Serial.print(address);
     //    Serial.print("   data:");
@@ -136,7 +136,8 @@ void test_eeprom(int page)
 
 void sdKartOku()
 {
-  File dataFile = sd.open("kodlama.txt");
+   File dataFile = sd.open("kodlama.txt");
+  //File dataFile = sd.open("eepromsil.txt");
   // if the file is available, write to it:
   if (dataFile)
   {
@@ -154,15 +155,17 @@ void sdKartOku()
           char data[4] = {'\0'};
           sprintf(data, "%c%c%c%c", dizi[0], dizi[1], dizi[2], dizi[3]);
           // Image[index2] = strtol(data, NULL, 16);
+          ram_array[index2 - (page * maxaddress)]=strtol(data, NULL, 16);
           writeEEPROM(index2, ram_array[index2 - (page * maxaddress)], EEPROM_I2C_ADDRESS);
-          // Serial.print(F("data:"));
-          // Serial.print(index2);
-          // Serial.println(data);
+          Serial.print(F("data:"));
+          //Serial.print(index2);
+          Serial.println(data);
           //ram_array[index2] = strtol(data, NULL, 16);
           index2++;
           if (index2 == maxaddress)
           {
-            break;
+           index2 = 0;
+            break; 
           }
           diziindex = 0;
         }
@@ -177,7 +180,11 @@ void sdKartOku()
     durum2 = true;
   }
 }
-void blink()
+void blink() {
+  state = !state;
+}
+
+void blinksdKart()
 {
    display.clearDisplay();
   display.setTextSize(1);              // Normal 1:1 pixel scale
@@ -206,6 +213,7 @@ void blink()
   // Serial.println("Writing Finished!");
   // delay(2000);    // Delay 2 Seconds
   test_eeprom(page);
+  state = !state;
 }
 
 void setup()
@@ -214,7 +222,7 @@ void setup()
    if (sd.begin(chipSelect))
   {
     // sdKartOku();
-    Serial.println(F("SD ok"));
+    Serial.println("SD ok");
   }
 
   pinMode(interruptPin, INPUT_PULLUP);
@@ -227,18 +235,18 @@ void setup()
   if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS))
   {
     Serial.println(F("SSD1306 allocation failed"));
-    // for (;;)
-    //   ; // Don't proceed, loop forever
+    for (;;)
+      ; // Don't proceed, loop forever
   }
   else
   {
     Serial.println(F("SSD1306 ok"));
-    display.clearDisplay();
-    display.setTextSize(1);              // Normal 1:1 pixel scale
-    display.setTextColor(SSD1306_WHITE); // Draw white text
-    display.setCursor(0, 0);             // Start at top-left corner
-    display.println(F("Hello, world!"));
-    display.display();
+    // display.clearDisplay();
+    // display.setTextSize(1);              // Normal 1:1 pixel scale
+    // display.setTextColor(SSD1306_WHITE); // Draw white text
+    // display.setCursor(0, 0);             // Start at top-left corner
+    // display.println(F("Hello, world!"));
+    // display.display();
   }
   // memcpy_P(ram_array, Image, maxaddress);// copy the image from flash memory to RAM
   delay(50);
@@ -248,6 +256,9 @@ void setup()
 
 void loop()
 {
+  if(state) {
+    blinksdKart();
+  }
   // yeniZaman = millis();
 
   // if (yeniZaman - eskiZaman > 5000)
